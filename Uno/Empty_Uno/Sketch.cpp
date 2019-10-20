@@ -24,81 +24,69 @@
 // modified by Regis for spider project, 2015-09-26
 // add remote control by HC-06 bluetooth module
 
+#include <sketch.h>
+
+/* -----------------------------------------------------------------------------
+  - Project: Remote control Crawling robot
+  - Author:  panerqiang@sunfounder.com
+  - Date:  2015/1/27
+   -----------------------------------------------------------------------------
+  - Overview
+  - This project was written for the Crawling robot desigened by Sunfounder.
+    This version of the robot has 4 legs, and each leg is driven by 3 servos.
+  This robot is driven by a Ardunio Nano Board with an expansion Board.
+  We recommend that you view the product documentation before using.
+  - Request
+  - This project requires some library files, which you can find in the head of
+    this file. Make sure you have installed these files.
+  - How to
+  - Before use,you must to adjust the robot,in order to make it more accurate.
+    - Adjustment operation
+    1.uncomment ADJUST, make and run
+    2.comment ADJUST, uncomment VERIFY
+    3.measure real sites and set to real_site[4][3], make and run
+    4.comment VERIFY, make and run
+  The document describes in detail how to operate.
+   ---------------------------------------------------------------------------*/
+
+// modified by Regis for spider project, 2015/09/11
 
 /* Includes ------------------------------------------------------------------*/
 #include <Servo.h>    //to define and control servos
 #include <FlexiTimer2.h>//to set a timer to manage all servos
-// RegisHsu, remote control
-#include <SerialCommand.h>
-
-Stream *MainPort = &Serial;
-
-SerialCommand SCmd(MainPort);   // The demo SerialCommand object
-
 /* Servos --------------------------------------------------------------------*/
-//define 12 servos for 4 legs
 Servo servo[4][3];
-//define servos' ports
-const int servo_pin[4][3] = { {2, 3, 4}, {5, 6, 7}, {8, 9, 10}, {11, 12, 13} };
-/* Size of the robot ---------------------------------------------------------*/
-const float length_a = 55;
-const float length_b = 77.5;
-const float length_c = 27.5;
-const float length_side = 71;
-const float z_absolute = -28;
-/* Constants for movement ----------------------------------------------------*/
-const float z_default = -50, z_up = -30, z_boot = z_absolute;
-const float x_default = 62, x_offset = 0;
-const float y_start = 0, y_step = 40;
-/* variables for movement ----------------------------------------------------*/
-volatile float site_now[4][3];    //real-time coordinates of the end of each leg
-volatile float site_expect[4][3]; //expected coordinates of the end of each leg
-float temp_speed[4][3];   //each axis' speed, needs to be recalculated before each movement
-float move_speed;     //movement speed
-float speed_multiple = 1; //movement speed multiple
-float spot_turn_speed = 4;
-float leg_move_speed = 8;
-float body_move_speed = 3;
-const float stand_seat_speed = 1;
-volatile int rest_counter;      //+1/0.02s, for automatic rest
-//functions' parameter
-const float KEEP = 255;
-//define PI for calculation
-const float pi = 3.1415926;
-/* Constants for turn --------------------------------------------------------*/
-//temp length
-const float temp_a = sqrt(pow(2 * x_default + length_side, 2) + pow(y_step, 2));
-const float temp_b = 2 * (y_start + y_step) + length_side;
-const float temp_c = sqrt(pow(2 * x_default + length_side, 2) + pow(2 * y_start + y_step + length_side, 2));
-const float temp_alpha = acos((pow(temp_a, 2) + pow(temp_b, 2) - pow(temp_c, 2)) / 2 / temp_a / temp_b);
-//site for turn
-const float turn_x1 = (temp_a - length_side) / 2;
-const float turn_y1 = y_start + y_step / 2;
-const float turn_x0 = turn_x1 - temp_b * cos(temp_alpha);
-const float turn_y0 = temp_b * sin(temp_alpha) - turn_y1 - length_side;
-
-// pin-A0
-#define IR_Detect_IO 14
-
 /* ---------------------------------------------------------------------------*/
 
 /*
   - setup function
    ---------------------------------------------------------------------------*/
-
-void stand(void);
-void hand_shake(int i);
-void set_site(int leg, float x, float y, float z);
-void wait_all_reach(void);
-void step_forward(unsigned int step);
-void step_back(unsigned int step);
-void turn_left(unsigned int step);
-void turn_right(unsigned int step);
-bool is_stand(void);
-void sit(void);
-void hand_wave(int i);
-void cartesian_to_polar(volatile float &alpha, volatile float &beta, volatile float &gamma, volatile float x, volatile float y, volatile float z);
-void polar_to_servo(int leg, float alpha, float beta, float gamma);
+void setup()
+{
+  //start serial for debug
+  Serial.begin(115200);
+  Serial.println("Robot starts initialization");
+  //initialize default parameter
+  set_site(0, x_default - x_offset, y_start + y_step, z_boot);
+  set_site(1, x_default - x_offset, y_start + y_step, z_boot);
+  set_site(2, x_default + x_offset, y_start, z_boot);
+  set_site(3, x_default + x_offset, y_start, z_boot);
+  for (int i = 0; i < 4; i++)
+  {
+    for (int j = 0; j < 3; j++)
+    {
+      site_now[i][j] = site_expect[i][j];
+    }
+  }
+  //start servo service
+  FlexiTimer2::set(20, servo_service);
+  FlexiTimer2::start();
+  Serial.println("Servo service started");
+  //initialize servos
+  servo_attach();
+  Serial.println("Servos initialized");
+  Serial.println("Robot initialization Complete");
+}
 
 
 void servo_attach(void)
@@ -107,13 +95,13 @@ void servo_attach(void)
   {
     for (int j = 0; j < 3; j++)
     {
-      servo[i][j].attach(servo_pin[i][j]); // init pins
+      servo[i][j].attach(servo_pin[i][j]);
       delay(100);
     }
   }
 }
 
-/*void servo_detach(void)
+void servo_detach(void)
 {
   for (int i = 0; i < 4; i++)
   {
@@ -123,123 +111,39 @@ void servo_attach(void)
       delay(100);
     }
   }
-}*/
-
-void do_test(void)
+}
+/*
+  - loop function
+   ---------------------------------------------------------------------------*/
+void loop()
 {
-  MainPort->println("Stand");
+  Serial.println("Stand");
   stand();
   delay(2000);
-  MainPort->println("Step forward");
+  Serial.println("Step forward");
   step_forward(5);
   delay(2000);
-  MainPort->println("Step back");
+  Serial.println("Step back");
   step_back(5);
   delay(2000);
-  MainPort->println("Turn left");
+  Serial.println("Turn left");
   turn_left(5);
   delay(2000);
-  MainPort->println("Turn right");
+  Serial.println("Turn right");
   turn_right(5);
   delay(2000);
-  MainPort->println("Hand wave");
+  Serial.println("Hand wave");
   hand_wave(3);
   delay(2000);
-  MainPort->println("Hand wave");
+  Serial.println("Hand wave");
   hand_shake(3);
-  delay(2000);
-  MainPort->println("Sit");
+  delay(2000);  
+  Serial.println("Body dance");
+  body_dance(10);
+  delay(2000);    
+  Serial.println("Sit");
   sit();
   delay(5000);
-}
-
-// RegisHsu
-// w 0 1: stand
-// w 0 0: sit
-// w 1 x: forward x step
-// w 2 x: back x step
-// w 3 x: right turn x step
-// w 4 x: left turn x step
-// w 5 x: hand shake x times
-// w 6 x: hand wave x times
-#define W_STAND_SIT    0
-#define W_FORWARD      1
-#define W_BACKWARD     2
-#define W_LEFT         3
-#define W_RIGHT        4
-#define W_SHAKE        5
-#define W_WAVE         6
-void action_cmd(void)
-{
-  char *arg;
-  int action_mode, n_step;
-  MainPort->println("Action:");
-  arg = SCmd.next();
-  action_mode = atoi(arg);
-  arg = SCmd.next();
-  n_step = atoi(arg);
-
-  switch (action_mode)
-  {
-    case W_FORWARD:
-      MainPort->println("Step forward");
-      if (!is_stand())
-        stand();
-      step_forward(n_step);
-      break;
-    case W_BACKWARD:
-      MainPort->println("Step back");
-      if (!is_stand())
-        stand();
-      step_back(n_step);
-      break;
-    case W_LEFT:
-      MainPort->println("Turn left");
-      if (!is_stand())
-        stand();
-      turn_left(n_step);
-      break;
-    case W_RIGHT:
-      MainPort->println("Turn right");
-      if (!is_stand())
-        stand();
-      turn_right(n_step);
-      break;
-    case W_STAND_SIT:
-      MainPort->println("1:up,0:dn");
-      if (n_step)
-        stand();
-      else
-        sit();
-      break;
-    case W_SHAKE:
-      MainPort->println("Hand shake");
-      hand_shake(n_step);
-      break;
-    case W_WAVE:
-      MainPort->println("Hand wave");
-      hand_wave(n_step);
-      break;
-    default:
-      MainPort->println("Error");
-      break;
-  }
-}
-
-// This gets set as the default handler, and gets called when no other command matches.
-void unrecognized(const char *command) {
-  MainPort->println("What?");
-}
-
-/*
-  - is_stand
-   ---------------------------------------------------------------------------*/
-bool is_stand(void)
-{
-  if (site_now[0][2] == z_default)
-    return true;
-  else
-    return false;
 }
 
 /*
@@ -675,6 +579,65 @@ void hand_shake(int i)
   }
 }
 
+void head_up(int i)
+{
+  set_site(0, KEEP, KEEP, site_now[0][2] - i);
+  set_site(1, KEEP, KEEP, site_now[1][2] + i);
+  set_site(2, KEEP, KEEP, site_now[2][2] - i);
+  set_site(3, KEEP, KEEP, site_now[3][2] + i);
+  wait_all_reach();
+}
+
+void head_down(int i)
+{
+  set_site(0, KEEP, KEEP, site_now[0][2] + i);
+  set_site(1, KEEP, KEEP, site_now[1][2] - i);
+  set_site(2, KEEP, KEEP, site_now[2][2] + i);
+  set_site(3, KEEP, KEEP, site_now[3][2] - i);
+  wait_all_reach();
+}
+
+void body_dance(int i)
+{
+  float x_tmp;
+  float y_tmp;
+  float z_tmp;
+  float body_dance_speed = 2;
+  sit();
+  move_speed = 1;
+  set_site(0, x_default, y_default, KEEP);
+  set_site(1, x_default, y_default, KEEP);
+  set_site(2, x_default, y_default, KEEP);
+  set_site(3, x_default, y_default, KEEP);
+  wait_all_reach();
+  //stand();
+  set_site(0, x_default, y_default, z_default - 20);
+  set_site(1, x_default, y_default, z_default - 20);
+  set_site(2, x_default, y_default, z_default - 20);
+  set_site(3, x_default, y_default, z_default - 20);
+  wait_all_reach();
+  move_speed = body_dance_speed;
+  head_up(30);
+  for (int j = 0; j < i; j++)
+  {
+    if (j > i / 4)
+      move_speed = body_dance_speed * 2;
+    if (j > i / 2)
+      move_speed = body_dance_speed * 3;
+    set_site(0, KEEP, y_default - 20, KEEP);
+    set_site(1, KEEP, y_default + 20, KEEP);
+    set_site(2, KEEP, y_default - 20, KEEP);
+    set_site(3, KEEP, y_default + 20, KEEP);
+    wait_all_reach();
+    set_site(0, KEEP, y_default + 20, KEEP);
+    set_site(1, KEEP, y_default - 20, KEEP);
+    set_site(2, KEEP, y_default + 20, KEEP);
+    set_site(3, KEEP, y_default - 20, KEEP);
+    wait_all_reach();
+  }
+  move_speed = body_dance_speed;
+  head_down(30);
+}
 
 
 /*
@@ -813,88 +776,4 @@ void polar_to_servo(int leg, float alpha, float beta, float gamma)
   servo[leg][0].write(alpha);
   servo[leg][1].write(beta);
   servo[leg][2].write(gamma);
-}
-
-void setup()
-{
-	//start serial for debug
-	Serial.begin(115200);
-	
-	MainPort->println("Robot starts initialization");
-	MainPort->flush();
-	
-	// config IR_Detect_IO pin as input
-	pinMode(IR_Detect_IO, INPUT);
-	
-	// RegisHsu, remote control
-	// Setup callbacks for SerialCommand commands
-	// action command 0-6,
-	// w 0 1: stand
-	// w 0 0: sit
-	// w 1 x: forward x step
-	// w 2 x: back x step
-	// w 3 x: right turn x step
-	// w 4 x: left turn x step
-	// w 5 x: hand shake x times
-	// w 6 x: hand wave x times
-	SCmd.addCommand("w", action_cmd);
-
-	SCmd.setDefaultHandler(unrecognized);
-
-	//initialize default parameter
-	set_site(0, x_default - x_offset, y_start + y_step, z_boot);
-	set_site(1, x_default - x_offset, y_start + y_step, z_boot);
-	set_site(2, x_default + x_offset, y_start, z_boot);
-	set_site(3, x_default + x_offset, y_start, z_boot);
-	for (int i = 0; i < 4; i++)
-	{
-		for (int j = 0; j < 3; j++)
-		{
-			site_now[i][j] = site_expect[i][j];
-		}
-	}
-	//start servo service
-	//FlexiTimer2::set(20, servo_service);
-	//FlexiTimer2::start();
-	MainPort->println("Servo service started");
-	//initialize servos
-	servo_attach(); // link the io pins to the servo array
-	MainPort->println("Servos initialized");
-	MainPort->println("Robot initialization Complete");
-}
-
-/*
-  - loop function
-   ---------------------------------------------------------------------------*/
-int flag_obstacle = 0;
-int mode_left_right = 0;
-void loop()
-{
-  int tmp_turn, tmp_leg, tmp_body;
-  //Regis, 2015-07-15, for Bluetooth command
-  SCmd.readSerial();
-  if (!digitalRead(IR_Detect_IO) && is_stand())
-  {
-    tmp_turn = spot_turn_speed;
-    tmp_leg = leg_move_speed;
-    tmp_body = body_move_speed;
-    spot_turn_speed = leg_move_speed = body_move_speed = 20;
-    if (flag_obstacle < 3)
-    {
-      step_back(1);
-      flag_obstacle++;
-    }
-    else
-    {
-      if (mode_left_right)
-        turn_right(1);
-      else
-        turn_left(1);
-      mode_left_right = 1 - mode_left_right;
-      flag_obstacle = 0;
-    }
-    spot_turn_speed = tmp_turn;
-    leg_move_speed = tmp_leg;
-    body_move_speed = tmp_body;
-  }
 }
