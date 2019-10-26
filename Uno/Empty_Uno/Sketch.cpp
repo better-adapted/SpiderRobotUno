@@ -75,7 +75,7 @@ Servo servo[4][3];
 void setup()
 {
   //start serial for debug
-  Serial.begin(57600);
+  Serial.begin(115200);
   Serial.println("Robot starts initialization");
   // config IR_Detect_IO pin as input
   pinMode(IR_Detect_IO, INPUT);
@@ -151,7 +151,7 @@ void loop()
   int tmp_turn, tmp_leg, tmp_body;
   //Regis, 2015-07-15, for Bluetooth command
   SCmd.readSerial();
-  if (!digitalRead(IR_Detect_IO) && is_stand())
+  /*if (!digitalRead(IR_Detect_IO) && is_stand())
   {
     tmp_turn = spot_turn_speed;
     tmp_leg = leg_move_speed;
@@ -174,7 +174,7 @@ void loop()
     spot_turn_speed = tmp_turn;
     leg_move_speed = tmp_leg;
     body_move_speed = tmp_body;
-  }
+  }*/
 }
 
 void do_test(void)
@@ -234,47 +234,83 @@ void action_cmd(void)
   switch (action_mode)
   {
     case W_FORWARD:
+	{
       Serial.println("Step forward");
       if (!is_stand())
+	  {
         stand();
+	  }
       step_forward(n_step);
-      break;
+	}
+    break;
+	  
     case W_BACKWARD:
+	{
       Serial.println("Step back");
       if (!is_stand())
+	  {
         stand();
+	  }
       step_back(n_step);
-      break;
+	}
+    break;
+	  
     case W_LEFT:
+	{
       Serial.println("Turn left");
       if (!is_stand())
+	  {
         stand();
+	  }
       turn_left(n_step);
-      break;
+	}
+    break;
+	  
     case W_RIGHT:
+	{
       Serial.println("Turn right");
       if (!is_stand())
+	  {
         stand();
+	  }
       turn_right(n_step);
-      break;
+	}
+    break;
+	  
     case W_STAND_SIT:
+	{
       Serial.println("1:up,0:dn");
       if (n_step)
+	  {
         stand();
+	  }
       else
-        sit();
-      break;
+	  {
+         sit();
+	  }
+	}
+	break;
+	  
     case W_SHAKE:
+	{
       Serial.println("Hand shake");
       hand_shake(n_step);
-      break;
+	}
+    break;
+	  
     case W_WAVE:
+	{
       Serial.println("Hand wave");
       hand_wave(n_step);
-      break;
+	}
+    break;
+	  
     default:
+	{
       Serial.println("Error");
-      break;
+	}
+    break;
+	
   }
 }
 

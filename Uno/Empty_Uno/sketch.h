@@ -31,7 +31,6 @@ const float z_absolute = -28;
 const float z_default = -50, z_up = -30, z_boot = z_absolute;
 const float x_default = 62, x_offset = 0;
 const float y_start = 0, y_step = 40;
-const float y_default = x_default;
 /* variables for movement ----------------------------------------------------*/
 volatile float site_now[4][3];    //real-time coordinates of the end of each leg
 volatile float site_expect[4][3]; //expected coordinates of the end of each leg
@@ -41,7 +40,7 @@ float speed_multiple = 1; //movement speed multiple
 float spot_turn_speed = 4;
 float leg_move_speed = 8;
 float body_move_speed = 3;
-float stand_seat_speed = 1;
+const float stand_seat_speed = 1;
 volatile int rest_counter;      //+1/0.02s, for automatic rest
 //functions' parameter
 const float KEEP = 255;
@@ -58,6 +57,5 @@ const float turn_x1 = (temp_a - length_side) / 2;
 const float turn_y1 = y_start + y_step / 2;
 const float turn_x0 = turn_x1 - temp_b * cos(temp_alpha);
 const float turn_y0 = temp_b * sin(temp_alpha) - turn_y1 - length_side;
-
 // pin-A0
 #define IR_Detect_IO 14
