@@ -26,6 +26,15 @@
 
 #include <sketch.h>
 
+//#define PROGRAM_LEG_FIX
+//#define PROGRAM_1
+#define PROGRAM_2
+
+#ifdef  PROGRAM_2
+#include "SerialCommand.h"
+SerialCommand SCmd(&Serial);   // The demo SerialCommand object
+#endif
+
 /* -----------------------------------------------------------------------------
   - Project: Remote control Crawling robot
   - Author:  panerqiang@sunfounder.com
@@ -61,32 +70,7 @@ Servo servo[4][3];
 /*
   - setup function
    ---------------------------------------------------------------------------*/
-void setup()
-{
-  //start serial for debug
-  Serial.begin(115200);
-  Serial.println("Robot starts initialization");
-  //initialize default parameter
-  set_site(0, x_default - x_offset, y_start + y_step, z_boot);
-  set_site(1, x_default - x_offset, y_start + y_step, z_boot);
-  set_site(2, x_default + x_offset, y_start, z_boot);
-  set_site(3, x_default + x_offset, y_start, z_boot);
-  for (int i = 0; i < 4; i++)
-  {
-    for (int j = 0; j < 3; j++)
-    {
-      site_now[i][j] = site_expect[i][j];
-    }
-  }
-  //start servo service
-  FlexiTimer2::set(20, servo_service);
-  FlexiTimer2::start();
-  Serial.println("Servo service started");
-  //initialize servos
-  servo_attach();
-  Serial.println("Servos initialized");
-  Serial.println("Robot initialization Complete");
-}
+
 
 
 void servo_attach(void)
@@ -112,38 +96,13 @@ void servo_detach(void)
     }
   }
 }
-/*
-  - loop function
-   ---------------------------------------------------------------------------*/
-void loop()
+
+bool is_stand(void)
 {
-  Serial.println("Stand");
-  stand();
-  delay(2000);
-  Serial.println("Step forward");
-  step_forward(5);
-  delay(2000);
-  Serial.println("Step back");
-  step_back(5);
-  delay(2000);
-  Serial.println("Turn left");
-  turn_left(5);
-  delay(2000);
-  Serial.println("Turn right");
-  turn_right(5);
-  delay(2000);
-  Serial.println("Hand wave");
-  hand_wave(3);
-  delay(2000);
-  Serial.println("Hand wave");
-  hand_shake(3);
-  delay(2000);  
-  Serial.println("Body dance");
-  body_dance(10);
-  delay(2000);    
-  Serial.println("Sit");
-  sit();
-  delay(5000);
+	if (site_now[0][2] == z_default)
+	return true;
+	else
+	return false;
 }
 
 /*
@@ -777,3 +736,292 @@ void polar_to_servo(int leg, float alpha, float beta, float gamma)
   servo[leg][1].write(beta);
   servo[leg][2].write(gamma);
 }
+
+#ifdef PROGRAM_1
+void setup()
+{
+	//start serial for debug
+	Serial.begin(115200);
+	Serial.println("Robot starts initialization");
+	//initialize default parameter
+	set_site(0, x_default - x_offset, y_start + y_step, z_boot);
+	set_site(1, x_default - x_offset, y_start + y_step, z_boot);
+	set_site(2, x_default + x_offset, y_start, z_boot);
+	set_site(3, x_default + x_offset, y_start, z_boot);
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < 3; j++)
+		{
+			site_now[i][j] = site_expect[i][j];
+		}
+	}
+	//start servo service
+	FlexiTimer2::set(20, servo_service);
+	FlexiTimer2::start();
+	Serial.println("Servo service started");
+	//initialize servos
+	servo_attach();
+	Serial.println("Servos initialized");
+	Serial.println("Robot initialization Complete");
+}
+
+/*
+  - loop function
+   ---------------------------------------------------------------------------*/
+void loop()
+{
+  Serial.println("Stand");
+  stand();
+  delay(2000);
+  Serial.println("Step forward");
+  step_forward(5);
+  delay(2000);
+  Serial.println("Step back");
+  step_back(5);
+  delay(2000);
+  Serial.println("Turn left");
+  turn_left(5);
+  delay(2000);
+  Serial.println("Turn right");
+  turn_right(5);
+  delay(2000);
+  Serial.println("Hand wave");
+  hand_wave(3);
+  delay(2000);
+  Serial.println("Hand wave");
+  hand_shake(3);
+  delay(2000);  
+  Serial.println("Body dance");
+  body_dance(10);
+  delay(2000);    
+  Serial.println("Sit");
+  sit();
+  delay(5000);
+}
+#endif
+
+#ifdef PROGRAM_2
+// RegisHsu
+// w 0 1: stand
+// w 0 0: sit
+// w 1 x: forward x step
+// w 2 x: back x step
+// w 3 x: right turn x step
+// w 4 x: left turn x step
+// w 5 x: hand shake x times
+// w 6 x: hand wave x times
+#define W_STAND_SIT    0
+#define W_FORWARD      1
+#define W_BACKWARD     2
+#define W_LEFT         3
+#define W_RIGHT        4
+#define W_SHAKE        5
+#define W_WAVE         6
+void action_cmd(void)
+{
+	char *arg;
+	int action_mode, n_step;
+	Serial.println("Action:");
+	arg = SCmd.next();
+	action_mode = atoi(arg);
+	arg = SCmd.next();
+	n_step = atoi(arg);
+
+	switch (action_mode)
+	{
+		case W_FORWARD:
+		Serial.println("Step forward");
+		if (!is_stand())
+			stand();
+			
+		step_forward(n_step);
+		break;
+		
+		case W_BACKWARD:
+		Serial.println("Step back");
+		if (!is_stand())
+		stand();
+		
+		step_back(n_step);
+		break;
+		
+		case W_LEFT:
+		Serial.println("Turn left");
+		if (!is_stand())
+			stand();
+		turn_left(n_step);
+		break;
+		
+		case W_RIGHT:
+		Serial.println("Turn right");
+		if (!is_stand())
+			stand();
+		turn_right(n_step);
+		break;
+		
+		case W_STAND_SIT:
+		Serial.println("1:up,0:dn");
+		if (n_step)
+			stand();
+		else
+			sit();
+		break;
+		
+		case W_SHAKE:
+		Serial.println("Hand shake");
+		hand_shake(n_step);
+		break;
+		
+		case W_WAVE:
+		Serial.println("Hand wave");
+		hand_wave(n_step);
+		break;
+		
+		default:
+		Serial.println("Error");
+		break;
+	}
+}
+
+// This gets set as the default handler, and gets called when no other command matches.
+void unrecognized(const char *command) {
+	Serial.println("What?");
+}
+
+void setup()
+{
+	//start serial for debug
+	Serial.begin(115200);
+	Serial.println("Robot starts initialization");
+	// config IR_Detect_IO pin as input
+	
+	pinMode(IR_Detect_IO, INPUT);
+	
+	// RegisHsu, remote control
+	// Setup callbacks for SerialCommand commands
+	// action command 0-6,
+	// w 0 1: stand
+	// w 0 0: sit
+	// w 1 x: forward x step
+	// w 2 x: back x step
+	// w 3 x: right turn x step
+	// w 4 x: left turn x step
+	// w 5 x: hand shake x times
+	// w 6 x: hand wave x times
+	SCmd.addCommand("w", action_cmd);
+
+	SCmd.setDefaultHandler(unrecognized);
+
+	//initialize default parameter
+	set_site(0, x_default - x_offset, y_start + y_step, z_boot);
+	set_site(1, x_default - x_offset, y_start + y_step, z_boot);
+	set_site(2, x_default + x_offset, y_start, z_boot);
+	set_site(3, x_default + x_offset, y_start, z_boot);
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < 3; j++)
+		{
+			site_now[i][j] = site_expect[i][j];
+		}
+	}
+	//start servo service
+	FlexiTimer2::set(20, servo_service);
+	FlexiTimer2::start();
+	Serial.println("Servo service started");
+	//initialize servos
+	servo_attach();
+	Serial.println("Servos initialized");
+	Serial.println("Robot initialization Complete");
+}
+
+int flag_obstacle = 0;
+int mode_left_right = 0;
+void loop()
+{
+	int tmp_turn, tmp_leg, tmp_body;
+	//Regis, 2015-07-15, for Bluetooth command
+	SCmd.readSerial();
+	if (is_stand())
+	{
+		tmp_turn = spot_turn_speed;
+		tmp_leg = leg_move_speed;
+		tmp_body = body_move_speed;
+		spot_turn_speed = leg_move_speed = body_move_speed = 20;
+		if (flag_obstacle < 3)
+		{
+			step_back(1);
+			flag_obstacle++;
+		}
+		else
+		{
+			if (mode_left_right)
+			turn_right(1);
+			else
+			turn_left(1);
+			mode_left_right = 1 - mode_left_right;
+			flag_obstacle = 0;
+		}
+		spot_turn_speed = tmp_turn;
+		leg_move_speed = tmp_leg;
+		body_move_speed = tmp_body;
+	}
+}
+
+void do_test(void)
+{
+	Serial.println("Stand");
+	stand();
+	delay(2000);
+	Serial.println("Step forward");
+	step_forward(5);
+	delay(2000);
+	Serial.println("Step back");
+	step_back(5);
+	delay(2000);
+	Serial.println("Turn left");
+	turn_left(5);
+	delay(2000);
+	Serial.println("Turn right");
+	turn_right(5);
+	delay(2000);
+	Serial.println("Hand wave");
+	hand_wave(3);
+	delay(2000);
+	Serial.println("Hand wave");
+	hand_shake(3);
+	delay(2000);
+	Serial.println("Sit");
+	sit();
+	delay(5000);
+}
+
+#endif
+
+
+#ifdef PROGRAM_LEG_FIX
+void setup()
+{
+	//initialize all servos
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < 3; j++)
+		{
+			servo[i][j].attach(servo_pin[i][j]);
+			delay(20);
+		}
+	}
+}
+
+void loop(void)
+{
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < 3; j++)
+		{
+			servo[i][j].write(90);
+			delay(20);
+		}
+	}
+}
+#endif
+
