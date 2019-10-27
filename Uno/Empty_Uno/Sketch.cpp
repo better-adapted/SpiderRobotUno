@@ -26,15 +26,10 @@
 
 #include <sketch.h>
 
-//#define PROGRAM_LEG_FIX
-//#define PROGRAM_1
-#define PROGRAM_2
-
-#ifdef  PROGRAM_2
 #include "SerialCommand.h"
 SerialCommand SCmd(&Serial);   // The demo SerialCommand object
-#endif
 
+bool leg_fix_mode=0;
 /* -----------------------------------------------------------------------------
   - Project: Remote control Crawling robot
   - Author:  panerqiang@sunfounder.com
@@ -71,50 +66,97 @@ Servo servo[4][3];
   - setup function
    ---------------------------------------------------------------------------*/
 
+#include <avr/wdt.h>
+
+
+void leg_fix_loop(void)
+{
+	while(1)
+	{
+		for (int i = 0; i < 4; i++)
+		{
+			for (int j = 0; j < 3; j++)
+			{
+				servo[i][j].write(90);
+				delay(20);
+			}
+		}		
+	}
+}
+
+void leg_fix_setup()
+{
+	//initialize all servos
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < 3; j++)
+		{
+			servo[i][j].attach(servo_pin[i][j]);
+			delay(20);
+		}
+	}
+}
+
+void soft_reset() 
+{
+	wdt_enable(WDTO_15MS);
+	while(1)
+	{
+	}
+}
 
 void setup()
 {
-  //start serial for debug
-  Serial.begin(115200);
-  Serial.println("Robot starts initialization");
-  // config IR_Detect_IO pin as input
-  pinMode(IR_Detect_IO, INPUT);
+  wdt_disable();
   
-  // RegisHsu, remote control
-  // Setup callbacks for SerialCommand commands
-  // action command 0-6,
-  // w 0 1: stand
-  // w 0 0: sit
-  // w 1 x: forward x step
-  // w 2 x: back x step
-  // w 3 x: right turn x step
-  // w 4 x: left turn x step
-  // w 5 x: hand shake x times
-  // w 6 x: hand wave x times
-  SCmd.addCommand("w", action_cmd);
-
-  SCmd.setDefaultHandler(unrecognized);
-
-  //initialize default parameter
-  set_site(0, x_default - x_offset, y_start + y_step, z_boot);
-  set_site(1, x_default - x_offset, y_start + y_step, z_boot);
-  set_site(2, x_default + x_offset, y_start, z_boot);
-  set_site(3, x_default + x_offset, y_start, z_boot);
-  for (int i = 0; i < 4; i++)
+  if(leg_fix_mode)
   {
-    for (int j = 0; j < 3; j++)
-    {
-      site_now[i][j] = site_expect[i][j];
-    }
+	  leg_fix_setup();
   }
-  //start servo service
-  FlexiTimer2::set(20, servo_service);
-  FlexiTimer2::start();
-  Serial.println("Servo service started");
-  //initialize servos
-  servo_attach();
-  Serial.println("Servos initialized");
-  Serial.println("Robot initialization Complete");
+  else
+  {
+	  //start serial for debug
+	  Serial.begin(115200);
+	  Serial.println("Robot starts initialization");
+	  // config IR_Detect_IO pin as input
+	  pinMode(IR_Detect_IO, INPUT);
+  
+	  // RegisHsu, remote control
+	  // Setup callbacks for SerialCommand commands
+	  // action command 0-6,
+	  // w 0 1: stand
+	  // w 0 0: sit
+	  // w 1 x: forward x step
+	  // w 2 x: back x step
+	  // w 3 x: right turn x step
+	  // w 4 x: left turn x step
+	  // w 5 x: hand shake x times
+	  // w 6 x: hand wave x times
+	  SCmd.addCommand("w", action_cmd);
+
+	  SCmd.setDefaultHandler(unrecognized);
+
+	  //initialize default parameter
+	  set_site(0, x_default - x_offset, y_start + y_step, z_boot);
+	  set_site(1, x_default - x_offset, y_start + y_step, z_boot);
+	  set_site(2, x_default + x_offset, y_start, z_boot);
+	  set_site(3, x_default + x_offset, y_start, z_boot);
+	  for (int i = 0; i < 4; i++)
+	  {
+		  for (int j = 0; j < 3; j++)
+		  {
+			  site_now[i][j] = site_expect[i][j];
+		  }
+	  }
+	  //start servo service
+	  FlexiTimer2::set(20, servo_service);
+	  FlexiTimer2::start();
+	  Serial.println("Servo service started");
+	  //initialize servos
+	  servo_attach();
+	  Serial.println("Servos initialized");
+	  Serial.println("Robot initialization Complete");	 	  
+  }  
 }
 
 
@@ -148,33 +190,40 @@ int flag_obstacle = 0;
 int mode_left_right = 0;
 void loop()
 {
-  int tmp_turn, tmp_leg, tmp_body;
-  //Regis, 2015-07-15, for Bluetooth command
-  SCmd.readSerial();
-  /*if (!digitalRead(IR_Detect_IO) && is_stand())
+  if(leg_fix_mode)
   {
-    tmp_turn = spot_turn_speed;
-    tmp_leg = leg_move_speed;
-    tmp_body = body_move_speed;
-    spot_turn_speed = leg_move_speed = body_move_speed = 20;
-    if (flag_obstacle < 3)
-    {
-      step_back(1);
-      flag_obstacle++;
-    }
-    else
-    {
-      if (mode_left_right)
-        turn_right(1);
-      else
-        turn_left(1);
-      mode_left_right = 1 - mode_left_right;
-      flag_obstacle = 0;
-    }
-    spot_turn_speed = tmp_turn;
-    leg_move_speed = tmp_leg;
-    body_move_speed = tmp_body;
-  }*/
+	  leg_fix_loop();
+  }
+  else
+  {
+	  int tmp_turn, tmp_leg, tmp_body;
+	  //Regis, 2015-07-15, for Bluetooth command
+	  SCmd.readSerial();
+	  /*if (!digitalRead(IR_Detect_IO) && is_stand())
+	  {
+		tmp_turn = spot_turn_speed;
+		tmp_leg = leg_move_speed;
+		tmp_body = body_move_speed;
+		spot_turn_speed = leg_move_speed = body_move_speed = 20;
+		if (flag_obstacle < 3)
+		{
+		  step_back(1);
+		  flag_obstacle++;
+		}
+		else
+		{
+		  if (mode_left_right)
+			turn_right(1);
+		  else
+			turn_left(1);
+		  mode_left_right = 1 - mode_left_right;
+		  flag_obstacle = 0;
+		}
+		spot_turn_speed = tmp_turn;
+		leg_move_speed = tmp_leg;
+		body_move_speed = tmp_body;
+	  }*/
+  }  
 }
 
 void do_test(void)
@@ -232,7 +281,7 @@ void action_cmd(void)
   n_step = atoi(arg);
 
   switch (action_mode)
-  {
+  {	 
     case W_FORWARD:
 	{
       Serial.println("Step forward");
